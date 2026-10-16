@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from pathlib import Path
 
 # ---------------------------------------------------------
@@ -200,13 +199,8 @@ if page == "Executive Dashboard":
                 .resample("MS").sum().rename("Sales").reset_index()
             )
             if not trend.empty:
-                fig = px.line(
-                    trend, x="Order_Date", y="Sales", markers=True,
-                    title="Monthly Sales Trend",
-                    labels={"Order_Date": "Month", "Sales": "Sales (₹)"},
-                )
-                fig.update_layout(template="plotly_white", hovermode="x unified")
-                st.plotly_chart(fig, use_container_width=True)
+                st.markdown("**Monthly Sales Trend**")
+                st.line_chart(trend.set_index("Order_Date")[["Sales"]], use_container_width=True)
             else:
                 st.info("No dated sales rows match the selected filters.")
         else:
@@ -218,29 +212,20 @@ if page == "Executive Dashboard":
                 .set_index("Order_Date")["Profit"]
                 .resample("MS").sum().rename("Profit").reset_index()
             )
-            figp = px.bar(
-                monthly_profit, x="Order_Date", y="Profit",
-                title="Monthly Profit", labels={"Order_Date": "Month", "Profit": "Profit (₹)"},
-            )
-            figp.update_layout(template="plotly_white")
-            st.plotly_chart(figp, use_container_width=True)
+            st.markdown("**Monthly Profit**")
+            st.bar_chart(monthly_profit.set_index("Order_Date")[["Profit"]], use_container_width=True)
 
     with tab2:
         if "Channel" in filtered.columns and "Sales" in filtered.columns:
             by_channel = filtered.groupby("Channel", dropna=False, as_index=False)["Sales"].sum()
             c1, c2 = st.columns(2)
             with c1:
-                st.plotly_chart(
-                    px.bar(by_channel, x="Channel", y="Sales", color="Channel",
-                           title="Sales by Channel", text_auto=".2s"),
-                    use_container_width=True,
-                )
+                st.markdown("**Sales by Channel**")
+                st.bar_chart(by_channel.set_index("Channel")[["Sales"]], use_container_width=True)
             with c2:
-                st.plotly_chart(
-                    px.pie(by_channel, names="Channel", values="Sales",
-                           title="Sales Contribution", hole=0.45),
-                    use_container_width=True,
-                )
+                st.markdown("**Sales Contribution by Channel**")
+                st.caption("Native Streamlit charts do not include a built-in pie/donut chart, so this uses a bar chart instead.")
+                st.bar_chart(by_channel.set_index("Channel")[["Sales"]], use_container_width=True)
         else:
             st.info("Channel analysis requires Channel and Sales columns.")
 
@@ -286,15 +271,18 @@ elif page == "Customer Analytics":
 
     left, right = st.columns(2)
     with left:
-        st.plotly_chart(
-            px.scatter(
-                data, x="Frequency", y="Monetary", color="Segment",
-                hover_data=["Customer_ID", "Recency"],
-                title="Customer Frequency vs Monetary Value",
-                labels={"Monetary": "Total Spend (₹)", "Frequency": "Order Frequency"},
-            ),
-            use_container_width=True,
-        )
+        st.markdown("**Customer Frequency vs Monetary Value**")
+        scatter_data = data[["Frequency", "Monetary", "Segment"]].dropna()
+        if not scatter_data.empty:
+            st.scatter_chart(
+                scatter_data,
+                x="Frequency",
+                y="Monetary",
+                color="Segment",
+                use_container_width=True,
+            )
+        else:
+            st.info("No valid frequency and monetary values are available to plot.")
     with right:
         summary = data.groupby("Segment", as_index=False).agg(
             Customers=("Customer_ID", "nunique"),
@@ -302,11 +290,8 @@ elif page == "Customer Analytics":
             Average_Recency=("Recency", "mean"),
             Average_Frequency=("Frequency", "mean"),
         )
-        st.plotly_chart(
-            px.bar(summary, x="Segment", y="Customers", color="Segment",
-                   title="Customers by Segment", text_auto=True),
-            use_container_width=True,
-        )
+        st.markdown("**Customers by Segment**")
+        st.bar_chart(summary.set_index("Segment")[["Customers"]], use_container_width=True)
 
     with st.expander("Segment summary table", expanded=True):
         st.dataframe(summary.round(2), use_container_width=True, hide_index=True)
@@ -352,15 +337,18 @@ elif page == "Churn Analysis":
     if "Recency_Days" in data.columns and "Spend" in data.columns:
         data["Recency_Days"] = pd.to_numeric(data["Recency_Days"], errors="coerce")
         data["Spend"] = pd.to_numeric(data["Spend"], errors="coerce")
-        st.plotly_chart(
-            px.scatter(
-                data, x="Recency_Days", y="Spend", color="Risk Category",
-                hover_data=[c for c in ["Customer_ID", "Orders", "Avg_Order_Value"] if c in data.columns],
-                title="Customer Spend vs Days Since Last Purchase",
-                labels={"Recency_Days": "Days Since Last Purchase", "Spend": "Total Spend (₹)"},
-            ),
-            use_container_width=True,
-        )
+        st.markdown("**Customer Spend vs Days Since Last Purchase**")
+        scatter_data = data[["Recency_Days", "Spend", "Risk Category"]].dropna()
+        if not scatter_data.empty:
+            st.scatter_chart(
+                scatter_data,
+                x="Recency_Days",
+                y="Spend",
+                color="Risk Category",
+                use_container_width=True,
+            )
+        else:
+            st.info("No valid recency and spend values are available to plot.")
     st.warning("Churn risk is a model-derived indicator, not proof that a customer will leave.")
     st.dataframe(data, use_container_width=True, hide_index=True)
     csv_download_button(data, "retailpulse_churn_risk.csv")
@@ -395,13 +383,8 @@ elif page == "Demand Forecast":
         max_day = max(1, len(data))
         horizon = st.slider("Display forecast horizon (days)", 1, max_day, max_day)
         view = data.head(horizon)
-        fig = px.line(
-            view, x="Date", y="Forecast_Units", markers=True,
-            title="Forecast Daily Demand",
-            labels={"Date": "Date", "Forecast_Units": "Forecast Units"},
-        )
-        fig.update_layout(template="plotly_white", hovermode="x unified")
-        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("**Forecast Daily Demand**")
+        st.line_chart(view.set_index("Date")[["Forecast_Units"]], use_container_width=True)
         st.dataframe(view, use_container_width=True, hide_index=True)
         csv_download_button(view, "retailpulse_demand_forecast.csv")
 
@@ -441,16 +424,9 @@ elif page == "Inventory Optimization":
     if not data.empty:
         top_n = st.slider("Products to show in chart", 5, min(30, max(5, len(data))), min(10, max(5, len(data))))
         top = data.nlargest(top_n, "Suggested_Reorder_Adjusted")
-        st.plotly_chart(
-            px.bar(
-                top.sort_values("Suggested_Reorder_Adjusted"),
-                x="Suggested_Reorder_Adjusted", y="Product_ID",
-                orientation="h", color="Suggested_Reorder_Adjusted",
-                title=f"Top {min(top_n, len(data))} Products by Suggested Reorder",
-                labels={"Suggested_Reorder_Adjusted": "Units to Reorder", "Product_ID": "Product"},
-            ),
-            use_container_width=True,
-        )
+        st.markdown(f"**Top {min(top_n, len(data))} Products by Suggested Reorder**")
+        reorder_chart = top.sort_values("Suggested_Reorder_Adjusted").set_index("Product_ID")
+        st.bar_chart(reorder_chart[["Suggested_Reorder_Adjusted"]], use_container_width=True)
 
     filter_reorder = st.checkbox("Show only products needing reorder", value=True)
     table = needs_reorder if filter_reorder else data
@@ -512,4 +488,4 @@ elif page == "Explore Data":
 
 # Footer / session info
 st.divider()
-st.caption("RetailPulse Analytics · Built with Python, Streamlit, Pandas and Plotly")
+st.caption("RetailPulse Analytics · Built with Python, Streamlit and Pandas")
